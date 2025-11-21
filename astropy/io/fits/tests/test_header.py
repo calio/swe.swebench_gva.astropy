@@ -2329,6 +2329,63 @@ class TestHeaderFunctions(FitsTestCase):
             else:
                 c.verify('exception')
 
+    def test_card_fromstring_with_bytes(self):
+        """Test that Card.fromstring accepts bytes input."""
+        # Test with bytes
+        card_bytes = b'SIMPLE  =                    T / file does conform to FITS standard             '
+        c = fits.Card.fromstring(card_bytes)
+        assert c.keyword == 'SIMPLE'
+        assert c.value is True
+        assert c.comment == 'file does conform to FITS standard'
+
+        # Test with string for comparison
+        card_str = 'SIMPLE  =                    T / file does conform to FITS standard             '
+        c_str = fits.Card.fromstring(card_str)
+        assert str(c) == str(c_str)
+
+    def test_header_fromstring_with_bytes(self):
+        """Test that Header.fromstring accepts bytes input."""
+        # Create a simple header as bytes
+        header_bytes = (
+            b'SIMPLE  =                    T / file does conform to FITS standard             '
+            b'BITPIX  =                    8 / number of bits per data pixel                  '
+            b'NAXIS   =                    0 / number of data axes                            '
+            b'END' + b' ' * 77
+        )
+        
+        h = fits.Header.fromstring(header_bytes)
+        assert h['SIMPLE'] is True
+        assert h['BITPIX'] == 8
+        assert h['NAXIS'] == 0
+
+        # Test with string for comparison
+        header_str = (
+            'SIMPLE  =                    T / file does conform to FITS standard             '
+            'BITPIX  =                    8 / number of bits per data pixel                  '
+            'NAXIS   =                    0 / number of data axes                            '
+            'END' + ' ' * 77
+        )
+        
+        h_str = fits.Header.fromstring(header_str)
+        assert h['SIMPLE'] == h_str['SIMPLE']
+        assert h['BITPIX'] == h_str['BITPIX']
+        assert h['NAXIS'] == h_str['NAXIS']
+
+    def test_header_fromstring_with_bytes_and_separator(self):
+        """Test that Header.fromstring accepts bytes with separator."""
+        # Create header with newline separator
+        header_bytes = (
+            b'SIMPLE  =                    T / file does conform to FITS standard\n'
+            b'BITPIX  =                    8 / number of bits per data pixel\n'
+            b'NAXIS   =                    0 / number of data axes\n'
+            b'END\n'
+        )
+        
+        h = fits.Header.fromstring(header_bytes, sep='\n')
+        assert h['SIMPLE'] is True
+        assert h['BITPIX'] == 8
+        assert h['NAXIS'] == 0
+
 
 class TestRecordValuedKeywordCards(FitsTestCase):
     """

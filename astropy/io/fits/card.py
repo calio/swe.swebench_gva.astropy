@@ -547,7 +547,7 @@ class Card(_Verify):
     @classmethod
     def fromstring(cls, image):
         """
-        Construct a `Card` object from a (raw) string. It will pad the string
+        Construct a `Card` object from a (raw) string or bytes. It will pad the string
         if it is not the length of a card image (80 columns).  If the card
         image is longer than 80 columns, assume it contains ``CONTINUE``
         card(s).
@@ -1268,6 +1268,11 @@ def _format_float(value):
 
 def _pad(input):
     """Pad blank space to the input string to be multiple of 80."""
+
+    # Convert bytes to string if necessary
+    if isinstance(input, bytes):
+        from .util import decode_ascii
+        input = decode_ascii(input)
 
     _len = len(input)
     if _len == Card.length:
