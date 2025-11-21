@@ -182,11 +182,15 @@ class CDS(Base):
         def p_division_of_units(p):
             """
             division_of_units : DIVISION unit_expression
-                              | unit_expression DIVISION combined_units
+                              | unit_expression DIVISION unit_expression
+                              | division_of_units DIVISION unit_expression
             """
             if len(p) == 3:
+                # DIVISION unit_expression
                 p[0] = p[2] ** -1
             else:
+                # unit_expression DIVISION unit_expression
+                # or division_of_units DIVISION unit_expression
                 p[0] = p[1] / p[3]
 
         def p_unit_expression(p):
