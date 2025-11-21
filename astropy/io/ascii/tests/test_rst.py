@@ -185,3 +185,33 @@ Col1      Col2 Col3 Col4
 ==== ========= ==== ====
 """,
     )
+
+
+def test_write_header_rows():
+    """Write a table as a SimpleRST Table with header_rows"""
+    from astropy.table import Table
+
+    # Create a table with units
+    t = Table(
+        [[1, 2], [1.0, 2.0], ["c", "d"], [4, 5]],
+        names=["Col1", "Col2", "Col3", "Col4"],
+    )
+    t["Col1"].unit = "m"
+    t["Col2"].unit = "s"
+    t["Col3"].unit = None
+    t["Col4"].unit = "m / s"
+
+    out = StringIO()
+    ascii.write(t, out, Writer=ascii.RST, header_rows=["name", "unit"])
+    assert_equal_splitlines(
+        out.getvalue(),
+        """\
+==== ==== ==== =====
+Col1 Col2 Col3  Col4
+   m    s      m / s
+==== ==== ==== =====
+   1  1.0    c     4
+   2  2.0    d     5
+==== ==== ==== =====
+""",
+    )

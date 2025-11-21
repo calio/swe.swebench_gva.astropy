@@ -1,0 +1,53 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8efb..78e42b7d63 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -57,8 +57,8 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, header_rows=None):
++        super().__init__(delimiter_pad=None, bookend=False, header_rows=header_rows)
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+diff --git a/astropy/io/ascii/tests/test_rst.py b/astropy/io/ascii/tests/test_rst.py
+index 84d6fed401..694df413e7 100644
+--- a/astropy/io/ascii/tests/test_rst.py
++++ b/astropy/io/ascii/tests/test_rst.py
+@@ -185,3 +185,33 @@ Col1      Col2 Col3 Col4
+ ==== ========= ==== ====
+ """,
+     )
++
++
++def test_write_header_rows():
++    """Write a table as a SimpleRST Table with header_rows"""
++    from astropy.table import Table
++
++    # Create a table with units
++    t = Table(
++        [[1, 2], [1.0, 2.0], ["c", "d"], [4, 5]],
++        names=["Col1", "Col2", "Col3", "Col4"],
++    )
++    t["Col1"].unit = "m"
++    t["Col2"].unit = "s"
++    t["Col3"].unit = None
++    t["Col4"].unit = "m / s"
++
++    out = StringIO()
++    ascii.write(t, out, Writer=ascii.RST, header_rows=["name", "unit"])
++    assert_equal_splitlines(
++        out.getvalue(),
++        """\
++==== ==== ==== =====
++Col1 Col2 Col3  Col4
++   m    s      m / s
++==== ==== ==== =====
++   1  1.0    c     4
++   2  2.0    d     5
++==== ==== ==== =====
++""",
++    )
