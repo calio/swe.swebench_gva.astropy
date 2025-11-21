@@ -928,3 +928,121 @@ class TestGetLocationGCRS:
         loc_gcrs_frame = get_location_gcrs(self.loc, self.obstime,
                                            cirs_to_itrs_mat(cirs_frame.obstime), pmat)
         self.check_obsgeo(loc_gcrs_frame.obsgeoloc, loc_gcrs_frame.obsgeovel)
+
+
+def test_itrs_to_altaz():
+    """
+    Test the direct ITRS to AltAz transformation.
+    """
+    # Create a test location
+    location = EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m)
+    obstime = Time('2020-01-01')
+    
+    # Create an ITRS coordinate at the equator on the prime meridian
+    # This should be at the Earth's surface
+    itrs = ITRS(x=6378137*u.m, y=0*u.m, z=0*u.m, obstime=obstime)
+    
+    # Transform to AltAz
+    altaz = itrs.transform_to(AltAz(obstime=obstime, location=location))
+    
+    # At the equator on the prime meridian, a point on the equator should be
+    # at the horizon (alt=0) and azimuth should be East (90 degrees)
+    assert_allclose(altaz.alt, 0*u.deg, atol=1e-10*u.deg)
+    assert_allclose(altaz.az, 90*u.deg, atol=1e-10*u.deg)
+
+
+def test_itrs_to_hadec():
+    """
+    Test the direct ITRS to HADec transformation.
+    """
+    # Create a test location
+    location = EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m)
+    obstime = Time('2020-01-01')
+    
+    # Create an ITRS coordinate at the equator on the prime meridian
+    itrs = ITRS(x=6378137*u.m, y=0*u.m, z=0*u.m, obstime=obstime)
+    
+    # Transform to HADec
+    hadec = itrs.transform_to(HADec(obstime=obstime, location=location))
+    
+    # At the equator on the prime meridian, a point on the equator should be
+    # at the horizon (dec=0) and hour angle should be East (negative)
+    assert_allclose(hadec.dec, 0*u.deg, atol=1e-10*u.deg)
+
+
+def test_altaz_to_itrs():
+    """
+    Test the direct AltAz to ITRS transformation.
+    """
+    # Create a test location
+    location = EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m)
+    obstime = Time('2020-01-01')
+    
+    # Create an AltAz coordinate at the horizon pointing East
+    altaz = AltAz(az=90*u.deg, alt=0*u.deg, obstime=obstime, location=location)
+    
+    # Transform to ITRS
+    itrs = altaz.transform_to(ITRS(obstime=obstime))
+    
+    # The ITRS coordinate should be on the equator
+    assert_allclose(itrs.z, 0*u.m, atol=1e-6*u.m)
+
+
+def test_hadec_to_itrs():
+    """
+    Test the direct HADec to ITRS transformation.
+    """
+    # Create a test location
+    location = EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m)
+    obstime = Time('2020-01-01')
+    
+    # Create a HADec coordinate at the horizon
+    hadec = HADec(ha=0*u.hourangle, dec=0*u.deg, obstime=obstime, location=location)
+    
+    # Transform to ITRS
+    itrs = hadec.transform_to(ITRS(obstime=obstime))
+    
+    # The ITRS coordinate should be on the equator
+    assert_allclose(itrs.z, 0*u.m, atol=1e-6*u.m)
+
+
+def test_itrs_altaz_roundtrip():
+    """
+    Test that ITRS -> AltAz -> ITRS roundtrip preserves coordinates.
+    """
+    # Create a test location
+    location = EarthLocation(lat=45*u.deg, lon=0*u.deg, height=0*u.m)
+    obstime = Time('2020-01-01')
+    
+    # Create an ITRS coordinate
+    itrs_orig = ITRS(x=6378137*u.m, y=0*u.m, z=0*u.m, obstime=obstime)
+    
+    # Transform to AltAz and back
+    altaz = itrs_orig.transform_to(AltAz(obstime=obstime, location=location))
+    itrs_final = altaz.transform_to(ITRS(obstime=obstime))
+    
+    # Check that we get back the original coordinates
+    assert_allclose(itrs_orig.cartesian.x, itrs_final.cartesian.x, atol=1e-6*u.m)
+    assert_allclose(itrs_orig.cartesian.y, itrs_final.cartesian.y, atol=1e-6*u.m)
+    assert_allclose(itrs_orig.cartesian.z, itrs_final.cartesian.z, atol=1e-6*u.m)
+
+
+def test_itrs_hadec_roundtrip():
+    """
+    Test that ITRS -> HADec -> ITRS roundtrip preserves coordinates.
+    """
+    # Create a test location
+    location = EarthLocation(lat=45*u.deg, lon=0*u.deg, height=0*u.m)
+    obstime = Time('2020-01-01')
+    
+    # Create an ITRS coordinate
+    itrs_orig = ITRS(x=6378137*u.m, y=0*u.m, z=0*u.m, obstime=obstime)
+    
+    # Transform to HADec and back
+    hadec = itrs_orig.transform_to(HADec(obstime=obstime, location=location))
+    itrs_final = hadec.transform_to(ITRS(obstime=obstime))
+    
+    # Check that we get back the original coordinates
+    assert_allclose(itrs_orig.cartesian.x, itrs_final.cartesian.x, atol=1e-6*u.m)
+    assert_allclose(itrs_orig.cartesian.y, itrs_final.cartesian.y, atol=1e-6*u.m)
+    assert_allclose(itrs_orig.cartesian.z, itrs_final.cartesian.z, atol=1e-6*u.m)
