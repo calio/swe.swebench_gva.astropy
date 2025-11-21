@@ -327,3 +327,22 @@ def test_args_None_kwarg():
 
     with pytest.raises(TypeError):
         x, y = myfunc_args(None, None)
+
+
+def test_constructor_with_none_return():
+    """Test that quantity_input works with constructors that have -> None return annotation."""
+    @u.quantity_input
+    def __init__(self, voltage: u.V) -> None:
+        self.voltage = voltage
+
+    # Create a simple class to test the decorated __init__
+    class TestClass:
+        pass
+
+    # Bind the decorated __init__ to the class
+    TestClass.__init__ = __init__
+
+    # This should not raise an error
+    obj = TestClass(1.*u.V)
+    assert isinstance(obj.voltage, u.Quantity)
+    assert obj.voltage.unit == u.V

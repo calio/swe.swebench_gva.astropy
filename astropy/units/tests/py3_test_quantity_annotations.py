@@ -285,3 +285,16 @@ def test_return_annotation():
     assert solarx.unit is u.deg
     """
     return src
+
+
+@py3only
+def test_return_annotation_none():
+    src = """
+    @u.quantity_input
+    def myfunc_init(voltage: u.V) -> None:
+        pass
+
+    result = myfunc_init(1.*u.V)
+    assert result is None
+    """
+    return src
