@@ -728,3 +728,25 @@ def test_read_html_unicode():
                 '</table>']
     dat = Table.read(table_in, format='ascii.html')
     assert np.all(dat['col1'] == ['Δ', 'Δ'])
+
+
+def test_write_table_html_formats():
+    """
+    Test that passing formats parameter to HTML writer works correctly.
+    This tests the fix for issue where formats were ignored in HTML output.
+    """
+    # Create a table with small float values
+    t = Table([(1.23875234858e-24, 3.2348748432e-15), (2, 4)], names=('a', 'b'))
+    
+    # Write with format specification for column 'a'
+    buffer_output = StringIO()
+    t.write(buffer_output, format='html', formats={'a': lambda x: f'{x:.2e}'})
+    output = buffer_output.getvalue()
+    
+    # Check that the formatted values appear in the output
+    assert '1.24e-24' in output
+    assert '3.23e-15' in output
+    
+    # Check that the unformatted values do NOT appear
+    assert '1.23875234858e-24' not in output
+    assert '3.2348748432e-15' not in output
