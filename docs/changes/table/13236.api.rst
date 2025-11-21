@@ -1,0 +1,5 @@
+Structured arrays are now automatically converted to ``NdarrayMixin`` when added
+to a ``Table``, with a ``FutureWarning`` indicating that this behavior will change
+in astropy 5.2. Users should wrap structured arrays in a ``Column`` to avoid the
+warning and prepare for the future behavior where structured arrays will be added
+as ``Column`` objects directly.

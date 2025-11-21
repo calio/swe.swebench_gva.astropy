@@ -1,0 +1,270 @@
+diff --git a/astropy/io/fits/header.py b/astropy/io/fits/header.py
+index 25d0c439d3..a156edbb44 100644
+--- a/astropy/io/fits/header.py
++++ b/astropy/io/fits/header.py
+@@ -398,20 +398,28 @@ class Header:
+         # require that they be Card.length long.  However, if the separator
+         # contains non-valid characters (namely \n) the cards may be split
+         # immediately at the separator
+-        require_full_cardlength = set(sep).issubset(VALID_HEADER_CHARS)
+-
+         if isinstance(data, bytes):
+             # FITS supports only ASCII, but decode as latin1 and just take all
+             # bytes for now; if it results in mojibake due to e.g. UTF-8
+             # encoded data in a FITS header that's OK because it shouldn't be
+             # there in the first place--accepting it here still gives us the
+             # opportunity to display warnings later during validation
++            if isinstance(sep, bytes):
++                sep_bytes = sep
++            else:
++                sep_bytes = sep.encode('latin1')
++            # For bytes data, we need to check if sep_bytes contains only valid
++            # FITS header characters (encoded as bytes)
++            valid_header_chars_bytes = set(
++                ord(c) for c in VALID_HEADER_CHARS)
++            require_full_cardlength = set(sep_bytes).issubset(valid_header_chars_bytes)
+             CONTINUE = b'CONTINUE'
+             END = b'END'
+             end_card = END_CARD.encode('ascii')
+-            sep = sep.encode('latin1')
++            sep = sep_bytes
+             empty = b''
+         else:
++            require_full_cardlength = set(sep).issubset(VALID_HEADER_CHARS)
+             CONTINUE = 'CONTINUE'
+             END = 'END'
+             end_card = END_CARD
+diff --git a/astropy/io/fits/tests/test_header.py b/astropy/io/fits/tests/test_header.py
+index 19fa8e7fec..2546706313 100644
+--- a/astropy/io/fits/tests/test_header.py
++++ b/astropy/io/fits/tests/test_header.py
+@@ -2442,6 +2442,33 @@ class TestHeaderFunctions(FitsTestCase):
+         assert pri_hdr == pri_hdr_from_bytes
+         assert pri_hdr.tostring() == pri_hdr_from_bytes.tostring()
+ 
++    def test_header_fromstring_bytes_with_bytes_separator(self):
++        """
++        Test reading a Header from bytes with a bytes separator.
++
++        This tests the fix for the issue where Header.fromstring would fail
++        when passed bytes data with a bytes separator, because it tried to
++        encode the separator without checking if it was already bytes.
++        """
++
++        header_bytes = (
++            b'SIMPLE  =                    T / conforms to FITS standard\n'
++            b'BITPIX  =                    8 / array data type\n'
++            b'NAXIS   =                    0 / number of array dimensions\n'
++            b'EXTEND  =                    T\n'
++        )
++        
++        # Test with bytes separator
++        hdr = fits.Header.fromstring(header_bytes, sep=b'\n')
++        assert hdr['SIMPLE'] is True
++        assert hdr['BITPIX'] == 8
++        assert hdr['NAXIS'] == 0
++        assert hdr['EXTEND'] is True
++        
++        # Test with string separator and bytes data
++        hdr2 = fits.Header.fromstring(header_bytes, sep='\n')
++        assert hdr == hdr2
++
+     def test_set_keyword_with_space(self):
+         """
+         Regression test for https://github.com/astropy/astropy/issues/10479
+diff --git a/astropy/modeling/separable.py b/astropy/modeling/separable.py
+index a308e27297..45bea36085 100644
+--- a/astropy/modeling/separable.py
++++ b/astropy/modeling/separable.py
+@@ -242,7 +242,7 @@ def _cstack(left, right):
+         cright = _coord_matrix(right, 'right', noutp)
+     else:
+         cright = np.zeros((noutp, right.shape[1]))
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+ 
+     return np.hstack([cleft, cright])
+ 
+diff --git a/astropy/modeling/tests/test_separable.py b/astropy/modeling/tests/test_separable.py
+index 8dfe5c8626..0b23b58142 100644
+--- a/astropy/modeling/tests/test_separable.py
++++ b/astropy/modeling/tests/test_separable.py
+@@ -148,3 +148,36 @@ def test_custom_model_separable():
+ 
+     assert not model_c().separable
+     assert np.all(separability_matrix(model_c()) == [True, True])
++
++
++def test_nested_compound_models():
++    """Test separability_matrix for nested compound models.
++    
++    Regression test for issue where nested compound models incorrectly
++    showed non-separable outputs.
++    """
++    # Test case 1: Simple nested compound model
++    cm = models.Linear1D(10) & models.Linear1D(5)
++    result = separability_matrix(cm)
++    expected = np.array([[True, False],
++                         [False, True]])
++    assert_allclose(result, expected)
++    
++    # Test case 2: Nested compound model with Pix2Sky_TAN
++    # This is the main regression test case from the issue
++    nested_cm = models.Pix2Sky_TAN() & cm
++    result = separability_matrix(nested_cm)
++    # Expected: Pix2Sky_TAN outputs (0,1) depend on inputs (0,1)
++    # Linear1D(10) output (2) depends on input (2)
++    # Linear1D(5) output (3) depends on input (3)
++    expected = np.array([[True, False, False, False],
++                         [False, True, False, False],
++                         [False, False, True, False],
++                         [False, False, False, True]])
++    assert_allclose(result, expected)
++    
++    # Test case 3: Verify it matches the non-nested version
++    non_nested_cm = models.Pix2Sky_TAN() & models.Linear1D(10) & models.Linear1D(5)
++    result_nested = separability_matrix(nested_cm)
++    result_non_nested = separability_matrix(non_nested_cm)
++    assert_allclose(result_nested, result_non_nested)
+diff --git a/astropy/table/table.py b/astropy/table/table.py
+index 72066fd358..1386d0f154 100644
+--- a/astropy/table/table.py
++++ b/astropy/table/table.py
+@@ -1243,6 +1243,15 @@ class Table:
+         # mixin class
+         if (not isinstance(data, Column) and not data_is_mixin
+                 and isinstance(data, np.ndarray) and len(data.dtype) > 1):
++            warnings.warn(
++                'Structured arrays are automatically converted to NdarrayMixin. '
++                'This behavior is deprecated and will be removed in astropy 5.2. '
++                'To avoid this warning, wrap the structured array in a Column: '
++                'Column(data). In the future, structured arrays will be added as '
++                'Column objects directly.',
++                FutureWarning,
++                stacklevel=4
++            )
+             data = data.view(NdarrayMixin)
+             data_is_mixin = True
+ 
+diff --git a/astropy/table/tests/test_mixin.py b/astropy/table/tests/test_mixin.py
+index 6aff7e2827..b6e813382e 100644
+--- a/astropy/table/tests/test_mixin.py
++++ b/astropy/table/tests/test_mixin.py
+@@ -712,9 +712,13 @@ def test_ndarray_mixin():
+     d = np.arange(8).reshape(4, 2).view(NdarrayMixin)
+ 
+     # Add one during initialization and the next as a new column.
+-    t = Table([a], names=['a'])
+-    t['b'] = b
+-    t['c'] = c
++    # Suppress the FutureWarning about structured arrays being converted to NdarrayMixin
++    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
++        t = Table([a], names=['a'])
++    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
++        t['b'] = b
++    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
++        t['c'] = c
+     t['d'] = d
+ 
+     assert isinstance(t['a'], NdarrayMixin)
+@@ -757,6 +761,30 @@ def test_ndarray_mixin():
+                            "(4, 'd') (40, 'dd') (400, 'rdd') 6 .. 7"]
+ 
+ 
++def test_ndarray_mixin_deprecation_warning():
++    """
++    Test that a FutureWarning is raised when a structured array is added to a table
++    and automatically converted to NdarrayMixin.
++    """
++    a = np.array([(1, 'a'), (2, 'b'), (3, 'c'), (4, 'd')],
++                 dtype='<i4,' + ('|U1'))
++    
++    # Test warning when adding during initialization
++    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
++        t = Table([a], names=['a'])
++    
++    assert isinstance(t['a'], NdarrayMixin)
++    
++    # Test warning when adding as a new column
++    b = np.array([(10, 'aa'), (20, 'bb'), (30, 'cc'), (40, 'dd')],
++                 dtype=[('x', 'i4'), ('y', ('U2'))])
++    
++    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
++        t['b'] = b
++    
++    assert isinstance(t['b'], NdarrayMixin)
++
++
+ def test_possible_string_format_functions():
+     """
+     The QuantityInfo info class for Quantity implements a
+diff --git a/astropy/units/core.py b/astropy/units/core.py
+index 0545dc00dd..2c730fbf6b 100644
+--- a/astropy/units/core.py
++++ b/astropy/units/core.py
+@@ -983,7 +983,14 @@ class UnitBase:
+         """
+         def make_converter(scale1, func, scale2):
+             def convert(v):
+-                return func(_condition_arg(v) / scale1) * scale2
++                v = _condition_arg(v)
++                # Preserve dtype by casting scales to match v's dtype
++                if hasattr(v, 'dtype') and v.dtype.kind == 'f':
++                    scale1_casted = v.dtype.type(scale1)
++                    scale2_casted = v.dtype.type(scale2)
++                    return func(v / scale1_casted) * scale2_casted
++                else:
++                    return func(v / scale1) * scale2
+             return convert
+ 
+         for funit, tunit, a, b in equivalencies:
+@@ -1040,7 +1047,15 @@ class UnitBase:
+             if scale == 1.:
+                 return unit_scale_converter
+             else:
+-                return lambda val: scale * _condition_arg(val)
++                # Preserve dtype by casting scale to match val's dtype
++                def scale_converter(val):
++                    val = _condition_arg(val)
++                    if hasattr(val, 'dtype') and val.dtype.kind == 'f':
++                        # For floating point types, cast scale to the same dtype
++                        return val.dtype.type(scale) * val
++                    else:
++                        return scale * val
++                return scale_converter
+ 
+         # if that doesn't work, maybe we can do it with equivalencies?
+         try:
+@@ -2563,7 +2578,13 @@ def unit_scale_converter(val):
+     This is a separate function so it can be recognized and
+     discarded in unit conversion.
+     """
+-    return 1. * _condition_arg(val)
++    val = _condition_arg(val)
++    # Preserve dtype by casting scale to match val's dtype (e.g., float16)
++    if hasattr(val, 'dtype') and val.dtype.kind == 'f':
++        # For floating point types, cast 1. to the same dtype
++        return val.dtype.type(1.) * val
++    else:
++        return 1. * val
+ 
+ 
+ dimensionless_unscaled = CompositeUnit(1, [], [], _error_check=False)
+diff --git a/astropy/units/tests/test_quantity.py b/astropy/units/tests/test_quantity.py
+index 05c415c62d..6eade05a62 100644
+--- a/astropy/units/tests/test_quantity.py
++++ b/astropy/units/tests/test_quantity.py
+@@ -132,6 +132,13 @@ class TestQuantityCreation:
+         a3_16 = np.array([1., 2.], dtype=np.float16)
+         q3_16 = u.Quantity(a3_16, u.yr)
+         assert q3_16.dtype == a3_16.dtype
++        # also test float16 scalars (issue #8872)
++        s3_16 = np.float16(1)
++        q3_16_scalar = u.Quantity(s3_16, u.yr)
++        assert q3_16_scalar.dtype == np.float16
++        # and via multiplication
++        q3_16_mult = np.float16(1) * u.km
++        assert q3_16_mult.dtype == np.float16
+         # items stored as objects by numpy should be converted to float
+         # by default
+         q4 = u.Quantity(decimal.Decimal('10.25'), u.m)

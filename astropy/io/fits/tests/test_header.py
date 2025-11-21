@@ -2442,6 +2442,33 @@ class TestHeaderFunctions(FitsTestCase):
         assert pri_hdr == pri_hdr_from_bytes
         assert pri_hdr.tostring() == pri_hdr_from_bytes.tostring()
 
+    def test_header_fromstring_bytes_with_bytes_separator(self):
+        """
+        Test reading a Header from bytes with a bytes separator.
+
+        This tests the fix for the issue where Header.fromstring would fail
+        when passed bytes data with a bytes separator, because it tried to
+        encode the separator without checking if it was already bytes.
+        """
+
+        header_bytes = (
+            b'SIMPLE  =                    T / conforms to FITS standard\n'
+            b'BITPIX  =                    8 / array data type\n'
+            b'NAXIS   =                    0 / number of array dimensions\n'
+            b'EXTEND  =                    T\n'
+        )
+        
+        # Test with bytes separator
+        hdr = fits.Header.fromstring(header_bytes, sep=b'\n')
+        assert hdr['SIMPLE'] is True
+        assert hdr['BITPIX'] == 8
+        assert hdr['NAXIS'] == 0
+        assert hdr['EXTEND'] is True
+        
+        # Test with string separator and bytes data
+        hdr2 = fits.Header.fromstring(header_bytes, sep='\n')
+        assert hdr == hdr2
+
     def test_set_keyword_with_space(self):
         """
         Regression test for https://github.com/astropy/astropy/issues/10479

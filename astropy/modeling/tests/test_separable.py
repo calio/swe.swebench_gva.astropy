@@ -148,3 +148,36 @@ def test_custom_model_separable():
 
     assert not model_c().separable
     assert np.all(separability_matrix(model_c()) == [True, True])
+
+
+def test_nested_compound_models():
+    """Test separability_matrix for nested compound models.
+    
+    Regression test for issue where nested compound models incorrectly
+    showed non-separable outputs.
+    """
+    # Test case 1: Simple nested compound model
+    cm = models.Linear1D(10) & models.Linear1D(5)
+    result = separability_matrix(cm)
+    expected = np.array([[True, False],
+                         [False, True]])
+    assert_allclose(result, expected)
+    
+    # Test case 2: Nested compound model with Pix2Sky_TAN
+    # This is the main regression test case from the issue
+    nested_cm = models.Pix2Sky_TAN() & cm
+    result = separability_matrix(nested_cm)
+    # Expected: Pix2Sky_TAN outputs (0,1) depend on inputs (0,1)
+    # Linear1D(10) output (2) depends on input (2)
+    # Linear1D(5) output (3) depends on input (3)
+    expected = np.array([[True, False, False, False],
+                         [False, True, False, False],
+                         [False, False, True, False],
+                         [False, False, False, True]])
+    assert_allclose(result, expected)
+    
+    # Test case 3: Verify it matches the non-nested version
+    non_nested_cm = models.Pix2Sky_TAN() & models.Linear1D(10) & models.Linear1D(5)
+    result_nested = separability_matrix(nested_cm)
+    result_non_nested = separability_matrix(non_nested_cm)
+    assert_allclose(result_nested, result_non_nested)

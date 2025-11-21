@@ -712,9 +712,13 @@ def test_ndarray_mixin():
     d = np.arange(8).reshape(4, 2).view(NdarrayMixin)
 
     # Add one during initialization and the next as a new column.
-    t = Table([a], names=['a'])
-    t['b'] = b
-    t['c'] = c
+    # Suppress the FutureWarning about structured arrays being converted to NdarrayMixin
+    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
+        t = Table([a], names=['a'])
+    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
+        t['b'] = b
+    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
+        t['c'] = c
     t['d'] = d
 
     assert isinstance(t['a'], NdarrayMixin)
@@ -755,6 +759,30 @@ def test_ndarray_mixin():
                            "(2, 'b') (20, 'bb') (200, 'rbb') 2 .. 3",
                            "(3, 'c') (30, 'cc') (300, 'rcc') 4 .. 5",
                            "(4, 'd') (40, 'dd') (400, 'rdd') 6 .. 7"]
+
+
+def test_ndarray_mixin_deprecation_warning():
+    """
+    Test that a FutureWarning is raised when a structured array is added to a table
+    and automatically converted to NdarrayMixin.
+    """
+    a = np.array([(1, 'a'), (2, 'b'), (3, 'c'), (4, 'd')],
+                 dtype='<i4,' + ('|U1'))
+    
+    # Test warning when adding during initialization
+    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
+        t = Table([a], names=['a'])
+    
+    assert isinstance(t['a'], NdarrayMixin)
+    
+    # Test warning when adding as a new column
+    b = np.array([(10, 'aa'), (20, 'bb'), (30, 'cc'), (40, 'dd')],
+                 dtype=[('x', 'i4'), ('y', ('U2'))])
+    
+    with pytest.warns(FutureWarning, match='Structured arrays are automatically converted'):
+        t['b'] = b
+    
+    assert isinstance(t['b'], NdarrayMixin)
 
 
 def test_possible_string_format_functions():

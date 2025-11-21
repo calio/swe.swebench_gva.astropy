@@ -983,7 +983,14 @@ class UnitBase:
         """
         def make_converter(scale1, func, scale2):
             def convert(v):
-                return func(_condition_arg(v) / scale1) * scale2
+                v = _condition_arg(v)
+                # Preserve dtype by casting scales to match v's dtype
+                if hasattr(v, 'dtype') and v.dtype.kind == 'f':
+                    scale1_casted = v.dtype.type(scale1)
+                    scale2_casted = v.dtype.type(scale2)
+                    return func(v / scale1_casted) * scale2_casted
+                else:
+                    return func(v / scale1) * scale2
             return convert
 
         for funit, tunit, a, b in equivalencies:
@@ -1040,7 +1047,15 @@ class UnitBase:
             if scale == 1.:
                 return unit_scale_converter
             else:
-                return lambda val: scale * _condition_arg(val)
+                # Preserve dtype by casting scale to match val's dtype
+                def scale_converter(val):
+                    val = _condition_arg(val)
+                    if hasattr(val, 'dtype') and val.dtype.kind == 'f':
+                        # For floating point types, cast scale to the same dtype
+                        return val.dtype.type(scale) * val
+                    else:
+                        return scale * val
+                return scale_converter
 
         # if that doesn't work, maybe we can do it with equivalencies?
         try:
@@ -2563,7 +2578,13 @@ def unit_scale_converter(val):
     This is a separate function so it can be recognized and
     discarded in unit conversion.
     """
-    return 1. * _condition_arg(val)
+    val = _condition_arg(val)
+    # Preserve dtype by casting scale to match val's dtype (e.g., float16)
+    if hasattr(val, 'dtype') and val.dtype.kind == 'f':
+        # For floating point types, cast 1. to the same dtype
+        return val.dtype.type(1.) * val
+    else:
+        return 1. * val
 
 
 dimensionless_unscaled = CompositeUnit(1, [], [], _error_check=False)

@@ -398,20 +398,28 @@ class Header:
         # require that they be Card.length long.  However, if the separator
         # contains non-valid characters (namely \n) the cards may be split
         # immediately at the separator
-        require_full_cardlength = set(sep).issubset(VALID_HEADER_CHARS)
-
         if isinstance(data, bytes):
             # FITS supports only ASCII, but decode as latin1 and just take all
             # bytes for now; if it results in mojibake due to e.g. UTF-8
             # encoded data in a FITS header that's OK because it shouldn't be
             # there in the first place--accepting it here still gives us the
             # opportunity to display warnings later during validation
+            if isinstance(sep, bytes):
+                sep_bytes = sep
+            else:
+                sep_bytes = sep.encode('latin1')
+            # For bytes data, we need to check if sep_bytes contains only valid
+            # FITS header characters (encoded as bytes)
+            valid_header_chars_bytes = set(
+                ord(c) for c in VALID_HEADER_CHARS)
+            require_full_cardlength = set(sep_bytes).issubset(valid_header_chars_bytes)
             CONTINUE = b'CONTINUE'
             END = b'END'
             end_card = END_CARD.encode('ascii')
-            sep = sep.encode('latin1')
+            sep = sep_bytes
             empty = b''
         else:
+            require_full_cardlength = set(sep).issubset(VALID_HEADER_CHARS)
             CONTINUE = 'CONTINUE'
             END = 'END'
             end_card = END_CARD
