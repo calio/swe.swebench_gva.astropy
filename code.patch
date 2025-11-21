@@ -1,0 +1,55 @@
+diff --git a/astropy/utils/misc.py b/astropy/utils/misc.py
+index de3fb01d18..72eb7898bb 100644
+--- a/astropy/utils/misc.py
++++ b/astropy/utils/misc.py
+@@ -528,14 +528,14 @@ class InheritDocstrings(type):
+                 not key.startswith('_'))
+ 
+         for key, val in dct.items():
+-            if (inspect.isfunction(val) and
+-                is_public_member(key) and
+-                val.__doc__ is None):
+-                for base in cls.__mro__[1:]:
+-                    super_method = getattr(base, key, None)
+-                    if super_method is not None:
+-                        val.__doc__ = super_method.__doc__
+-                        break
++            if (is_public_member(key) and val.__doc__ is None):
++                # Check if it's a function or property
++                if inspect.isfunction(val) or isinstance(val, property):
++                    for base in cls.__mro__[1:]:
++                        super_method = getattr(base, key, None)
++                        if super_method is not None:
++                            val.__doc__ = super_method.__doc__
++                            break
+ 
+         super().__init__(name, bases, dct)
+ 
+diff --git a/astropy/utils/tests/test_misc.py b/astropy/utils/tests/test_misc.py
+index 4f632e8d15..e6b0cd4dfb 100644
+--- a/astropy/utils/tests/test_misc.py
++++ b/astropy/utils/tests/test_misc.py
+@@ -89,6 +89,23 @@ def test_inherit_docstrings():
+         assert Subclass.__call__.__doc__ == "FOO"
+ 
+ 
++def test_inherit_docstrings_property():
++    """Test that InheritDocstrings works for properties."""
++    class Base(metaclass=misc.InheritDocstrings):
++        @property
++        def value(self):
++            "Property docstring"
++            return 42
++
++    class Subclass(Base):
++        @property
++        def value(self):
++            return 42
++
++    # The property should inherit the docstring from the base class
++    assert Subclass.value.__doc__ == "Property docstring"
++
++
+ def test_set_locale():
+     # First, test if the required locales are available
+     current = locale.setlocale(locale.LC_ALL)

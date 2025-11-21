@@ -528,14 +528,14 @@ class InheritDocstrings(type):
                 not key.startswith('_'))
 
         for key, val in dct.items():
-            if (inspect.isfunction(val) and
-                is_public_member(key) and
-                val.__doc__ is None):
-                for base in cls.__mro__[1:]:
-                    super_method = getattr(base, key, None)
-                    if super_method is not None:
-                        val.__doc__ = super_method.__doc__
-                        break
+            if (is_public_member(key) and val.__doc__ is None):
+                # Check if it's a function or property
+                if inspect.isfunction(val) or isinstance(val, property):
+                    for base in cls.__mro__[1:]:
+                        super_method = getattr(base, key, None)
+                        if super_method is not None:
+                            val.__doc__ = super_method.__doc__
+                            break
 
         super().__init__(name, bases, dct)
 

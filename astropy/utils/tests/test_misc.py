@@ -89,6 +89,23 @@ def test_inherit_docstrings():
         assert Subclass.__call__.__doc__ == "FOO"
 
 
+def test_inherit_docstrings_property():
+    """Test that InheritDocstrings works for properties."""
+    class Base(metaclass=misc.InheritDocstrings):
+        @property
+        def value(self):
+            "Property docstring"
+            return 42
+
+    class Subclass(Base):
+        @property
+        def value(self):
+            return 42
+
+    # The property should inherit the docstring from the base class
+    assert Subclass.value.__doc__ == "Property docstring"
+
+
 def test_set_locale():
     # First, test if the required locales are available
     current = locale.setlocale(locale.LC_ALL)
