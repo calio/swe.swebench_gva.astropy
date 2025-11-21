@@ -731,6 +731,14 @@ def test_compare_with_none():
     assert u.m != None  # nopep8
 
 
+def test_unrecognized_unit_compare_with_none():
+    # Ensure that equality comparisons with `None` work for UnrecognizedUnit
+    # and don't raise exceptions.
+    x = u.Unit('asdf', parse_strict='silent')
+    assert not (x == None)  # nopep8
+    assert x != None  # nopep8
+
+
 def test_validate_power_detect_fraction():
     frac = utils.validate_power(1.1666666666666665)
     assert isinstance(frac, Fraction)

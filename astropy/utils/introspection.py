@@ -147,6 +147,9 @@ def minversion(module, version, inclusive=True, version_path='__version__'):
     m = re.match(expr, version)
     if m:
         version = m.group(0)
+    m = re.match(expr, have_version)
+    if m:
+        have_version = m.group(0)
 
     if inclusive:
         return LooseVersion(have_version) >= LooseVersion(version)

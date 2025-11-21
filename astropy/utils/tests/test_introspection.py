@@ -73,3 +73,14 @@ def test_minversion():
         assert minversion(test_module, version)
     for version in bad_versions:
         assert not minversion(test_module, version)
+
+
+def test_minversion_dev_versions():
+    """Test that minversion handles dev versions correctly (issue #7671)."""
+    from types import ModuleType
+    test_module = ModuleType(str("test_module"))
+    # Test case from issue: comparing '1.14.3' >= '1.14dev' should work
+    test_module.__version__ = '1.14.3'
+    assert minversion(test_module, '1.14dev')
+    assert minversion(test_module, '1.14')
+    assert not minversion(test_module, '1.15dev')

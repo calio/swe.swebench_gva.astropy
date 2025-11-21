@@ -1,0 +1,68 @@
+diff --git a/astropy/units/core.py b/astropy/units/core.py
+index e9bd986d33..0ee8cf869b 100644
+--- a/astropy/units/core.py
++++ b/astropy/units/core.py
+@@ -1710,7 +1710,10 @@ class UnrecognizedUnit(IrreducibleUnit):
+         _unrecognized_operator
+ 
+     def __eq__(self, other):
+-        other = Unit(other, parse_strict='silent')
++        try:
++            other = Unit(other, parse_strict='silent')
++        except (ValueError, UnitsError, TypeError):
++            return False
+         return isinstance(other, UnrecognizedUnit) and self.name == other.name
+ 
+     def __ne__(self, other):
+diff --git a/astropy/units/tests/test_units.py b/astropy/units/tests/test_units.py
+index 000c12d221..0e6fdc4733 100644
+--- a/astropy/units/tests/test_units.py
++++ b/astropy/units/tests/test_units.py
+@@ -731,6 +731,14 @@ def test_compare_with_none():
+     assert u.m != None  # nopep8
+ 
+ 
++def test_unrecognized_unit_compare_with_none():
++    # Ensure that equality comparisons with `None` work for UnrecognizedUnit
++    # and don't raise exceptions.
++    x = u.Unit('asdf', parse_strict='silent')
++    assert not (x == None)  # nopep8
++    assert x != None  # nopep8
++
++
+ def test_validate_power_detect_fraction():
+     frac = utils.validate_power(1.1666666666666665)
+     assert isinstance(frac, Fraction)
+diff --git a/astropy/utils/introspection.py b/astropy/utils/introspection.py
+index e437b40c87..4b3d448ced 100644
+--- a/astropy/utils/introspection.py
++++ b/astropy/utils/introspection.py
+@@ -147,6 +147,9 @@ def minversion(module, version, inclusive=True, version_path='__version__'):
+     m = re.match(expr, version)
+     if m:
+         version = m.group(0)
++    m = re.match(expr, have_version)
++    if m:
++        have_version = m.group(0)
+ 
+     if inclusive:
+         return LooseVersion(have_version) >= LooseVersion(version)
+diff --git a/astropy/utils/tests/test_introspection.py b/astropy/utils/tests/test_introspection.py
+index 99dd9de730..487c7e5207 100644
+--- a/astropy/utils/tests/test_introspection.py
++++ b/astropy/utils/tests/test_introspection.py
+@@ -73,3 +73,14 @@ def test_minversion():
+         assert minversion(test_module, version)
+     for version in bad_versions:
+         assert not minversion(test_module, version)
++
++
++def test_minversion_dev_versions():
++    """Test that minversion handles dev versions correctly (issue #7671)."""
++    from types import ModuleType
++    test_module = ModuleType(str("test_module"))
++    # Test case from issue: comparing '1.14.3' >= '1.14dev' should work
++    test_module.__version__ = '1.14.3'
++    assert minversion(test_module, '1.14dev')
++    assert minversion(test_module, '1.14')
++    assert not minversion(test_module, '1.15dev')
