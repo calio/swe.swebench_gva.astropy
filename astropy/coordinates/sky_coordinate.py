@@ -1,6 +1,7 @@
 import copy
 import operator
 import re
+import sys
 import warnings
 
 import erfa
@@ -893,6 +894,18 @@ class SkyCoord(ShapedLikeNDArray):
             frame_cls = frame_transform_graph.lookup_name(attr)
             if frame_cls is not None and self.frame.is_transformable_to(frame_cls):
                 return self.transform_to(attr)
+
+        # Check if the attribute is a descriptor (e.g., property, method) in the class hierarchy.
+        # If it is, and we got here, it means the descriptor raised an AttributeError.
+        # We should call the descriptor directly to get the original error message.
+        for cls in type(self).__mro__:
+            if attr in cls.__dict__:
+                descriptor = cls.__dict__[attr]
+                # If it's a descriptor with __get__, call it to trigger the original error
+                if hasattr(descriptor, "__get__"):
+                    return descriptor.__get__(self, type(self))
+                # Otherwise, return the descriptor itself (e.g., for methods)
+                return descriptor
 
         # Fail
         raise AttributeError(

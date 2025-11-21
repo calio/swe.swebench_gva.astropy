@@ -2165,3 +2165,22 @@ def test_match_to_catalog_3d_and_sky():
     npt.assert_array_equal(idx, [0, 1, 2, 3])
     assert_allclose(angle, 0 * u.deg, atol=1e-14 * u.deg, rtol=0)
     assert_allclose(distance, 0 * u.kpc, atol=1e-14 * u.kpc, rtol=0)
+
+
+def test_subclass_property_attribute_error():
+    """Test that subclassed SkyCoord gives correct error message for properties.
+    
+    When a custom property in a SkyCoord subclass tries to access a non-existent
+    attribute, the error message should report the missing attribute, not the
+    property itself. See issue #14096.
+    """
+    class CustomSkyCoord(SkyCoord):
+        @property
+        def custom_prop(self):
+            return self.nonexistent_attr
+    
+    c = CustomSkyCoord('00h42m30s', '+41d12m00s', frame='icrs')
+    
+    # The error should mention 'nonexistent_attr', not 'custom_prop'
+    with pytest.raises(AttributeError, match="'CustomSkyCoord' object has no attribute 'nonexistent_attr'"):
+        c.custom_prop
