@@ -566,7 +566,8 @@ def test_pprint_py3_bytes():
     val = bytes('val', encoding='utf-8')
     blah = 'bläh'.encode('utf-8')
     dat = np.array([val, blah], dtype=[('col', 'S10')])
-    t = table.Table(dat)
+    with pytest.warns(FutureWarning, match='Structured array column will be converted'):
+        t = table.Table(dat)
     assert t['col'].pformat() == ['col ', '----', ' val', 'bläh']
 
 

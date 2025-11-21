@@ -506,7 +506,11 @@ def test_init_table_with_names_and_structured_dtype(has_data):
     """Test fix for #10393"""
     arr = np.ones(2, dtype=np.dtype([('a', 'i4'), ('b', 'f4')]))
     data_args = [arr] if has_data else []
-    t = Table(*data_args, names=['x', 'y'], dtype=arr.dtype)
+    if has_data:
+        with pytest.warns(FutureWarning, match='Structured array column will be converted'):
+            t = Table(*data_args, names=['x', 'y'], dtype=arr.dtype)
+    else:
+        t = Table(*data_args, names=['x', 'y'], dtype=arr.dtype)
     assert t.colnames == ['x', 'y']
     assert str(t['x'].dtype) == 'int32'
     assert str(t['y'].dtype) == 'float32'
@@ -524,7 +528,8 @@ def test_init_and_ref_from_multidim_ndarray(table_type):
         nd = np.array([(1, [10, 20]),
                        (3, [30, 40])],
                       dtype=[('a', 'i8'), ('b', 'i8', (2,))])
-        t = table_type(nd, copy=copy)
+        with pytest.warns(FutureWarning, match='Structured array column will be converted'):
+            t = table_type(nd, copy=copy)
         assert t.colnames == ['a', 'b']
         assert t['a'].shape == (2,)
         assert t['b'].shape == (2, 2)

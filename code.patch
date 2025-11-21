@@ -1,0 +1,80 @@
+diff --git a/astropy/table/table.py b/astropy/table/table.py
+index 5afe2127a3..acd507cb2b 100644
+--- a/astropy/table/table.py
++++ b/astropy/table/table.py
+@@ -1243,6 +1243,14 @@ class Table:
+         # mixin class
+         if (not isinstance(data, Column) and not data_is_mixin
+                 and isinstance(data, np.ndarray) and len(data.dtype) > 1):
++            warnings.warn(
++                'Structured array column will be converted to a Column object. '
++                'To silence this warning, wrap the array in a Column object. '
++                'In the future (5.2), structured arrays will be added as Column objects. '
++                'See https://github.com/astropy/astropy/issues/13236 for more information.',
++                FutureWarning,
++                stacklevel=4
++            )
+             data = data.view(NdarrayMixin)
+             data_is_mixin = True
+ 
+diff --git a/astropy/table/tests/test_init_table.py b/astropy/table/tests/test_init_table.py
+index 370030143f..755b73bb76 100644
+--- a/astropy/table/tests/test_init_table.py
++++ b/astropy/table/tests/test_init_table.py
+@@ -506,7 +506,11 @@ def test_init_table_with_names_and_structured_dtype(has_data):
+     """Test fix for #10393"""
+     arr = np.ones(2, dtype=np.dtype([('a', 'i4'), ('b', 'f4')]))
+     data_args = [arr] if has_data else []
+-    t = Table(*data_args, names=['x', 'y'], dtype=arr.dtype)
++    if has_data:
++        with pytest.warns(FutureWarning, match='Structured array column will be converted'):
++            t = Table(*data_args, names=['x', 'y'], dtype=arr.dtype)
++    else:
++        t = Table(*data_args, names=['x', 'y'], dtype=arr.dtype)
+     assert t.colnames == ['x', 'y']
+     assert str(t['x'].dtype) == 'int32'
+     assert str(t['y'].dtype) == 'float32'
+@@ -524,7 +528,8 @@ def test_init_and_ref_from_multidim_ndarray(table_type):
+         nd = np.array([(1, [10, 20]),
+                        (3, [30, 40])],
+                       dtype=[('a', 'i8'), ('b', 'i8', (2,))])
+-        t = table_type(nd, copy=copy)
++        with pytest.warns(FutureWarning, match='Structured array column will be converted'):
++            t = table_type(nd, copy=copy)
+         assert t.colnames == ['a', 'b']
+         assert t['a'].shape == (2,)
+         assert t['b'].shape == (2, 2)
+diff --git a/astropy/table/tests/test_mixin.py b/astropy/table/tests/test_mixin.py
+index 2fdcd20d8f..d58b78da16 100644
+--- a/astropy/table/tests/test_mixin.py
++++ b/astropy/table/tests/test_mixin.py
+@@ -712,9 +712,12 @@ def test_ndarray_mixin():
+     d = np.arange(8, dtype='i8').reshape(4, 2).view(NdarrayMixin)
+ 
+     # Add one during initialization and the next as a new column.
+-    t = Table([a], names=['a'])
+-    t['b'] = b
+-    t['c'] = c
++    with pytest.warns(FutureWarning, match='Structured array column will be converted'):
++        t = Table([a], names=['a'])
++    with pytest.warns(FutureWarning, match='Structured array column will be converted'):
++        t['b'] = b
++    with pytest.warns(FutureWarning, match='Structured array column will be converted'):
++        t['c'] = c
+     t['d'] = d
+ 
+     assert isinstance(t['a'], NdarrayMixin)
+diff --git a/astropy/table/tests/test_pprint.py b/astropy/table/tests/test_pprint.py
+index 0e9c4393d6..3d17660271 100644
+--- a/astropy/table/tests/test_pprint.py
++++ b/astropy/table/tests/test_pprint.py
+@@ -566,7 +566,8 @@ def test_pprint_py3_bytes():
+     val = bytes('val', encoding='utf-8')
+     blah = 'bläh'.encode('utf-8')
+     dat = np.array([val, blah], dtype=[('col', 'S10')])
+-    t = table.Table(dat)
++    with pytest.warns(FutureWarning, match='Structured array column will be converted'):
++        t = table.Table(dat)
+     assert t['col'].pformat() == ['col ', '----', ' val', 'bläh']
+ 
+ 
