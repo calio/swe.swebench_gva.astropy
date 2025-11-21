@@ -4,6 +4,7 @@
 
 
 import inspect
+import re
 import types
 import importlib
 from distutils.version import LooseVersion
@@ -138,6 +139,19 @@ def minversion(module, version, inclusive=True, version_path='__version__'):
         have_version = getattr(module, version_path)
     else:
         have_version = resolve_name(module.__name__, version_path)
+
+    # Strip non-numeric version components to work around a bug in LooseVersion
+    # (https://bugs.python.org/issue30272) where it fails to compare versions
+    # with non-numeric suffixes like 'dev', 'rc1', etc.
+    # See https://github.com/astropy/astropy/issues/5944
+    version_pattern = r'^([1-9]\d*!)?(0|[1-9]\d*)(\.(0|[1-9]\d*))*'
+    have_version_match = re.match(version_pattern, have_version)
+    if have_version_match:
+        have_version = have_version_match.group(0)
+    
+    version_match = re.match(version_pattern, version)
+    if version_match:
+        version = version_match.group(0)
 
     if inclusive:
         return LooseVersion(have_version) >= LooseVersion(version)
