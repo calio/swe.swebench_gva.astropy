@@ -1341,6 +1341,40 @@ class TableDataDiff(_BaseDiff):
 
         super().__init__(a, b)
 
+    def _compare_vla(self, a, b):
+        """
+        Compare two VLA (variable-length array) elements.
+        
+        This method properly handles comparison of variable-length arrays by
+        checking if they have the same shape before using np.allclose().
+        
+        Parameters
+        ----------
+        a : array-like
+            First VLA element to compare
+        b : array-like
+            Second VLA element to compare
+            
+        Returns
+        -------
+        bool
+            True if the elements are equal within tolerance, False otherwise
+        """
+        a_arr = np.asarray(a)
+        b_arr = np.asarray(b)
+        
+        # Check if the arrays have the same shape - this is critical for VLA comparison
+        # because np.allclose() can broadcast arrays of different lengths
+        if a_arr.shape != b_arr.shape:
+            return False
+        
+        # Use np.allclose for floating-point comparison, but only if shapes match
+        try:
+            return np.allclose(a_arr, b_arr, rtol=self.rtol, atol=self.atol, equal_nan=True)
+        except (TypeError, ValueError):
+            # Fall back to array_equal for non-numeric types
+            return np.array_equal(a_arr, b_arr)
+
     def _diff(self):
         # Much of the code for comparing columns is similar to the code for
         # comparing headers--consider refactoring
@@ -1449,15 +1483,15 @@ class TableDataDiff(_BaseDiff):
                 arrb.dtype, np.floating
             ):
                 diffs = where_not_allclose(arra, arrb, rtol=self.rtol, atol=self.atol)
-            elif "P" in col.format:
+            elif "P" in col.format or arra.dtype == np.object_:
+                # Handle VLA columns (format contains 'P') or object arrays
+                # (which can contain variable-length data)
                 diffs = (
-                    [
+                    np.array([
                         idx
                         for idx in range(len(arra))
-                        if not np.allclose(
-                            arra[idx], arrb[idx], rtol=self.rtol, atol=self.atol
-                        )
-                    ],
+                        if not self._compare_vla(arra[idx], arrb[idx])
+                    ]),
                 )
             else:
                 diffs = np.where(arra != arrb)

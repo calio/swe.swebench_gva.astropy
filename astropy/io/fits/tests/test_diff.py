@@ -923,3 +923,28 @@ def test_rawdatadiff_diff_with_rtol(tmp_path):
 
     assert "...and at 1 more indices." in str1
     assert "...and at 1 more indices." not in str2
+
+
+def test_identical_vla_tables():
+    """
+    Regression test for https://github.com/astropy/astropy/issues/14539
+
+    Ensure that FITSDiff correctly identifies identical files with VLA columns.
+    Previously, np.allclose would broadcast arrays of different lengths,
+    causing false positives when comparing VLA data.
+    """
+    # Create a table with a variable-length double array column
+    col = Column("a", format="QD", array=[[0], [0, 0]])
+    hdu = BinTableHDU.from_columns([col])
+
+    # Create two identical HDULists
+    hdula = HDUList([PrimaryHDU(), hdu])
+    hdulb = HDUList([PrimaryHDU(), hdu.copy()])
+
+    # Compare the tables - they should be identical
+    diff = FITSDiff(hdula, hdulb)
+    assert diff.identical, diff.report()
+
+    # Also test TableDataDiff directly
+    diff_data = TableDataDiff(hdu.data, hdu.copy().data)
+    assert diff_data.identical
