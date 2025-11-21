@@ -1310,3 +1310,40 @@ def test_raise_method_not_supported():
     # raise error for unsupported propagation operations:
     with pytest.raises(ValueError):
         ndd1.uncertainty.propagate(np.mod, ndd2, result, correlation)
+
+
+def test_mask_propagation_with_bitwise_or_one_operand_no_mask():
+    """Test mask propagation when one operand has no mask (issue #14995)."""
+    array = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
+    mask = np.array([[0, 1, 64], [8, 0, 1], [2, 1, 0]])
+
+    nref_nomask = NDDataArithmetic(array)
+    nref_mask = NDDataArithmetic(array, mask=mask)
+
+    # Test 1: multiply mask by constant (mask * no mask)
+    result1 = nref_mask.multiply(1., handle_mask=np.bitwise_or)
+    assert_array_equal(result1.mask, mask)
+
+    # Test 2: multiply mask by no mask (mask * no mask)
+    result2 = nref_mask.multiply(nref_nomask, handle_mask=np.bitwise_or)
+    assert_array_equal(result2.mask, mask)
+
+    # Test 3: multiply no mask by mask (no mask * mask)
+    result3 = nref_nomask.multiply(nref_mask, handle_mask=np.bitwise_or)
+    assert_array_equal(result3.mask, mask)
+
+    # Test 4: add mask by constant (mask + no mask)
+    result4 = nref_mask.add(1., handle_mask=np.bitwise_or)
+    assert_array_equal(result4.mask, mask)
+
+    # Test 5: add mask by no mask (mask + no mask)
+    result5 = nref_mask.add(nref_nomask, handle_mask=np.bitwise_or)
+    assert_array_equal(result5.mask, mask)
+
+    # Test 6: subtract mask by constant (mask - no mask)
+    result6 = nref_mask.subtract(1., handle_mask=np.bitwise_or)
+    assert_array_equal(result6.mask, mask)
+
+    # Test 7: divide mask by constant (mask / no mask)
+    result7 = nref_mask.divide(1., handle_mask=np.bitwise_or)
+    assert_array_equal(result7.mask, mask)
