@@ -1404,3 +1404,53 @@ if HAS_SCIPY:
                 ),
             ):
                 function(1.0 * u.kg, 3.0 * u.m / u.s)
+
+
+class TestArrayUfuncNotImplemented:
+    """Test that __array_ufunc__ returns NotImplemented for incompatible inputs.
+    
+    This allows duck types that implement __array_ufunc__ to handle operations
+    with Quantity objects that have incompatible units.
+    """
+
+    def test_array_ufunc_returns_notimplemented_for_incompatible_units(self):
+        """Test that __array_ufunc__ returns NotImplemented for incompatible units.
+        
+        This is a regression test for https://github.com/astropy/astropy/issues/13977
+        """
+        import dataclasses
+
+        @dataclasses.dataclass
+        class DuckArray(np.lib.mixins.NDArrayOperatorsMixin):
+            """A duck type of Quantity for testing."""
+            ndarray: u.Quantity
+
+            @property
+            def unit(self):
+                return self.ndarray.unit
+
+            def __array_ufunc__(self, function, method, *inputs, **kwargs):
+                inputs = [
+                    inp.ndarray if isinstance(inp, DuckArray) else inp
+                    for inp in inputs
+                ]
+
+                for inp in inputs:
+                    if isinstance(inp, np.ndarray):
+                        result = inp.__array_ufunc__(function, method, *inputs, **kwargs)
+                        if result is not NotImplemented:
+                            return DuckArray(result)
+
+                return NotImplemented
+
+        # Test that operations with incompatible units return NotImplemented
+        # and allow the reflected operator to be called
+        duck = DuckArray(1 * u.mm)
+        quantity = 1 * u.m
+
+        # This should work by calling DuckArray.__radd__ after
+        # Quantity.__array_ufunc__ returns NotImplemented
+        result = quantity + duck
+        assert isinstance(result, DuckArray)
+        assert result.ndarray.unit == u.mm
+        assert_allclose(result.ndarray.value, 1000.0)

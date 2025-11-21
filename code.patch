@@ -1,0 +1,77 @@
+diff --git a/astropy/units/quantity.py b/astropy/units/quantity.py
+index b98abfafb0..62332f6722 100644
+--- a/astropy/units/quantity.py
++++ b/astropy/units/quantity.py
+@@ -640,7 +640,13 @@ class Quantity(np.ndarray):
+         # input to that expected (e.g., radian for np.sin), or to get
+         # consistent units between two inputs (e.g., in np.add) --
+         # and the unit of the result (or tuple of units for nout > 1).
+-        converters, unit = converters_and_unit(function, method, *inputs)
++        try:
++            converters, unit = converters_and_unit(function, method, *inputs)
++        except (TypeError, ValueError, UnitsError):
++            # If the inputs are incompatible, return NotImplemented to allow
++            # the reflected operator to be called on the other operand.
++            # This is consistent with the NumPy __array_ufunc__ protocol.
++            return NotImplemented
+ 
+         out = kwargs.get("out", None)
+         # Avoid loop back by turning any Quantity output into array views.
+diff --git a/astropy/units/tests/test_quantity_ufuncs.py b/astropy/units/tests/test_quantity_ufuncs.py
+index 5f8c3ab3eb..40d3c567a9 100644
+--- a/astropy/units/tests/test_quantity_ufuncs.py
++++ b/astropy/units/tests/test_quantity_ufuncs.py
+@@ -1404,3 +1404,53 @@ if HAS_SCIPY:
+                 ),
+             ):
+                 function(1.0 * u.kg, 3.0 * u.m / u.s)
++
++
++class TestArrayUfuncNotImplemented:
++    """Test that __array_ufunc__ returns NotImplemented for incompatible inputs.
++    
++    This allows duck types that implement __array_ufunc__ to handle operations
++    with Quantity objects that have incompatible units.
++    """
++
++    def test_array_ufunc_returns_notimplemented_for_incompatible_units(self):
++        """Test that __array_ufunc__ returns NotImplemented for incompatible units.
++        
++        This is a regression test for https://github.com/astropy/astropy/issues/13977
++        """
++        import dataclasses
++
++        @dataclasses.dataclass
++        class DuckArray(np.lib.mixins.NDArrayOperatorsMixin):
++            """A duck type of Quantity for testing."""
++            ndarray: u.Quantity
++
++            @property
++            def unit(self):
++                return self.ndarray.unit
++
++            def __array_ufunc__(self, function, method, *inputs, **kwargs):
++                inputs = [
++                    inp.ndarray if isinstance(inp, DuckArray) else inp
++                    for inp in inputs
++                ]
++
++                for inp in inputs:
++                    if isinstance(inp, np.ndarray):
++                        result = inp.__array_ufunc__(function, method, *inputs, **kwargs)
++                        if result is not NotImplemented:
++                            return DuckArray(result)
++
++                return NotImplemented
++
++        # Test that operations with incompatible units return NotImplemented
++        # and allow the reflected operator to be called
++        duck = DuckArray(1 * u.mm)
++        quantity = 1 * u.m
++
++        # This should work by calling DuckArray.__radd__ after
++        # Quantity.__array_ufunc__ returns NotImplemented
++        result = quantity + duck
++        assert isinstance(result, DuckArray)
++        assert result.ndarray.unit == u.mm
++        assert_allclose(result.ndarray.value, 1000.0)

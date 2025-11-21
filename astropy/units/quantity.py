@@ -640,7 +640,13 @@ class Quantity(np.ndarray):
         # input to that expected (e.g., radian for np.sin), or to get
         # consistent units between two inputs (e.g., in np.add) --
         # and the unit of the result (or tuple of units for nout > 1).
-        converters, unit = converters_and_unit(function, method, *inputs)
+        try:
+            converters, unit = converters_and_unit(function, method, *inputs)
+        except (TypeError, ValueError, UnitsError):
+            # If the inputs are incompatible, return NotImplemented to allow
+            # the reflected operator to be called on the other operand.
+            # This is consistent with the NumPy __array_ufunc__ protocol.
+            return NotImplemented
 
         out = kwargs.get("out", None)
         # Avoid loop back by turning any Quantity output into array views.
