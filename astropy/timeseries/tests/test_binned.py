@@ -28,7 +28,7 @@ def test_empty_initialization_invalid():
     with pytest.raises(ValueError) as exc:
         ts['flux'] = [1, 2, 3]
     assert exc.value.args[0] == ("BinnedTimeSeries object is invalid - expected "
-                                 "'time_bin_start' as the first column but found 'flux'")
+                                 "['time_bin_start', 'time_bin_size'] as the first columns but found ['flux']")
 
 
 def test_initialization_time_bin_invalid():

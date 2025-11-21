@@ -35,7 +35,7 @@ def test_empty_initialization_invalid():
     with pytest.raises(ValueError) as exc:
         ts['flux'] = [1, 2, 3]
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'flux'")
+                                 "['time'] as the first column but found ['flux']")
 
 
 def test_initialize_only_time():
@@ -367,33 +367,33 @@ def test_required_columns():
     with pytest.raises(ValueError) as exc:
         ts.copy().add_column(Column([3, 4, 5], name='c'), index=0)
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'c'")
+                                 "['time'] as the first column but found ['c']")
 
     with pytest.raises(ValueError) as exc:
         ts.copy().add_columns([Column([3, 4, 5], name='d'),
                                Column([3, 4, 5], name='e')], indexes=[0, 1])
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'd'")
+                                 "['time'] as the first column but found ['d', 'e']")
 
     with pytest.raises(ValueError) as exc:
         ts.copy().keep_columns(['a', 'b'])
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'a'")
+                                 "['time'] as the first column but found ['a', 'b']")
 
     with pytest.raises(ValueError) as exc:
         ts.copy().remove_column('time')
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'a'")
+                                 "['time'] as the first column but found ['a']")
 
     with pytest.raises(ValueError) as exc:
         ts.copy().remove_columns(['time', 'a'])
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'b'")
+                                 "['time'] as the first column but found ['b']")
 
     with pytest.raises(ValueError) as exc:
         ts.copy().rename_column('time', 'banana')
     assert exc.value.args[0] == ("TimeSeries object is invalid - expected "
-                                 "'time' as the first column but found 'banana'")
+                                 "['time'] as the first column but found ['banana']")
 
 
 @pytest.mark.parametrize('cls', [BoxLeastSquares, LombScargle])
